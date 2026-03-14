@@ -92,6 +92,8 @@ module tt_um_fibonacci_JoaoBortolace (
                          (dispData == 4'h8) ? 7'b1111111 : // 8
                          (dispData == 4'h9) ? 7'b1101111 : // 9
                                               7'b1000000;  // Error Dash (-)
+
+    wire _unused = &{ui_in[7:1], uio_in, ena, 1'b0};
 endmodule
 
 module FibonacciCounter #(
