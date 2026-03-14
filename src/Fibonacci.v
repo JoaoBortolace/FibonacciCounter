@@ -106,7 +106,7 @@ module FibonacciCounter #(
     output reg [NUM_BITS-1:0] fib_number
 );
     reg [NUM_BITS-1:0] aux_reg; 
-    wire [NUM_BITS:0] sum = {1'b0, fib_number} + {1'b0, aux_reg};
+    wire [NUM_BITS-1:0] sum = fib_number + aux_reg;
 
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
@@ -121,12 +121,12 @@ module FibonacciCounter #(
             if (advance && disp_ready) begin
                 newNumber <= 1; // Trigger new conversion
 
-                if (sum[NUM_BITS]) begin // Overflow detection (reset to start)
+                if (aux_reg < fib_number) begin // Overflow detection (reset to start)
                     fib_number <= 0;
                     aux_reg    <= 1;
                 end else begin
                     fib_number <= aux_reg;
-                    aux_reg    <= sum[NUM_BITS-1:0];
+                    aux_reg    <= sum;
                 end
             end
         end
