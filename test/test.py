@@ -1,56 +1,60 @@
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, Timer, ClockCycles
+from cocotb.triggers import RisingEdge, ClockCycles
+
+# Helper function to wait for a specific digit to be active and return its segments
+async def get_segments_for_digit(dut, digit_mask):
+    # Wait up to 10 cycles to find the right digit in the multiplexing cycle
+    for _ in range(10):
+        # Check if the active digit (uio_out) matches our mask (e.g., 00001 for units)
+        if (int(dut.uio_out.value) & 0x1F) == digit_mask:
+            return int(dut.uo_out.value) & 0x7F
+        await RisingEdge(dut.clk)
+    return None
 
 @cocotb.test()
-async def test_project(dut):
-    dut._log.info("Starting Fibonacci 7-Segment Test")
+async def test_fibonacci_sequence(dut):
+    dut._log.info("Starting Multiplexed Display Test")
     
-    # 1. Setup Clock: 1kHz (1ms period) to match multiplexing requirements
     clock = Clock(dut.clk, 1, units="ms")
     cocotb.start_soon(clock.start())
 
-    # 2. Reset Sequence
-    dut._log.info("Applying Reset")
+    # Reset
+    dut.rst_n.value = 0
+    dut.ui_in.value = 0
     dut.ena.value = 1
-    dut.ui_in.value = 0      # Ensure manual step is low
-    dut.uio_in.value = 0
-    dut.rst_n.value = 0      # Active low reset
     await ClockCycles(dut.clk, 5)
-    dut.rst_n.value = 1      # Release reset
+    dut.rst_n.value = 1
     await ClockCycles(dut.clk, 5)
 
-    # 3. Test Fibonacci 0 (Initial State)
-    dut._log.info("Checking Initial State: Fibonacci 0")
-    
-    # Wait for signals to stabilize
-    await ClockCycles(dut.clk, 2)
-    
-    # Mask uo_out[6:0] to get only 7-segment patterns (ignore ready bit [7])
-    segments = int(dut.uo_out.value) & 0x7F
-    
-    # In the Verilog code, digit '0' is mapped to 7'b0111111 (0x3F)
-    dut._log.info(f"Segments for digit 0: {hex(segments)} (Expected: 0x3f)")
-    assert segments == 0x3f, f"Error: Fibonacci 0 should show 0x3f, but got {hex(segments)}"
+    # Fibonacci Sequence to test: 0, 1, 1, 2, 3, 5, 8, 13...
+    expected_values = [
+        {"val": 0, "seg": 0x3f},
+        {"val": 1, "seg": 0x06},
+        {"val": 1, "seg": 0x06},
+        {"val": 2, "seg": 0x5b}
+    ]
 
-    # 4. Trigger Manual Step (ui_in[0])
-    await ClockCycles(dut.clk, 20)
-    dut._log.info("Pulsing ui_in[0] to request next Fibonacci number")
-    dut.ui_in.value = 1      # Pulse high
-    await ClockCycles(dut.clk, 2)
-    dut.ui_in.value = 0      # Return to low
-    
-    # 5. Wait for BCD Conversion
-    # Double Dabble takes 17 cycles. Waiting 20 to be safe.
-    dut._log.info("Waiting for BCD conversion (Double Dabble process)...")
-    await ClockCycles(dut.clk, 20)
-    
-    # 6. Test Fibonacci 1 (Next State)
-    # The next number is 1. Digit '1' is 7'b0000110 (0x06) in your Verilog
-    segments = int(dut.uo_out.value) & 0x7F
-    dut._log.info(f"Segments for digit 1: {hex(segments)} (Expected: 0x06)")
-    
-    assert segments == 0x06, f"Error: Fibonacci 1 should show 0x06, but got {hex(segments)}"
+    for item in expected_values:
+        dut._log.info(f"Testing Fibonacci number: {item['val']}")
 
-    dut._log.info("All manual step and conversion tests passed successfully!")
+        # 1. Wait until BCD is ready (Bit 7 of uo_out)
+        while (int(dut.uo_out.value) & 0x80) == 0:
+            await RisingEdge(dut.clk)
 
+        # 2. Capture segments specifically when Digit 0 (Units) is active
+        # Digit 0 mask is 5'b00001 (0x01)
+        segments = await get_segments_for_digit(dut, 0x01)
+        
+        dut._log.info(f"Detected segments: {hex(segments)} for digit 0")
+        assert segments == item['seg'], f"Error: Expected {hex(item['seg'])}, got {hex(segments)}"
+
+        # 3. Pulse 'advance' for next number (using ui_in[0])
+        dut.ui_in.value = 1
+        await ClockCycles(dut.clk, 2)
+        dut.ui_in.value = 0
+        
+        # Wait a bit for the conversion to start (ready goes low)
+        await ClockCycles(dut.clk, 2)
+
+    dut._log.info("Multiplexed sequence test passed!")
