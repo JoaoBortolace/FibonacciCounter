@@ -70,4 +70,31 @@ async def test_full_fibonacci_all_digits(dut):
         dut.ui_in.value = 0
         await ClockCycles(dut.clk, 5) # Wait for conversion to start
 
+    dut._log.info(f"--- Overflow ---")
+
+    # Pulse ui_in[0] to advance
+    dut.ui_in.value = 1
+    await ClockCycles(dut.clk, 2)
+    dut.ui_in.value = 0
+    await ClockCycles(dut.clk, 5) # Wait for conversion to start
+
+    # 1. Wait for BCD Ready (Bit 7 of uo_out)
+    while (int(dut.uo_out.value) & 0x80) == 0:
+        await RisingEdge(dut.clk)
+
+    # 2. Check all 5 digits for the current number
+    temp_val = 0
+    for i in range(5):
+        digit_val = temp_val % 10
+        expected_seg = SEG_MAP[digit_val]
+        
+        actual_seg = await get_segments_for_digit(dut, i)
+        
+        # Log only units or if digit is non-zero to keep log clean
+        if i == 0 or temp_val > 0:
+            dut._log.info(f"Digit {i}: Expected {digit_val} ({hex(expected_seg)}), Got {hex(actual_seg)}")
+            assert actual_seg == expected_seg, f"Error at Fib {fib_curr}, Digit {i}!"
+        
+        temp_val //= 10
+
     dut._log.info("Full sequence (0 to 46368) verified for ALL digits!")
