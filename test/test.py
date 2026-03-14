@@ -34,6 +34,7 @@ async def test_project(dut):
     assert segments == 0x3f, f"Error: Fibonacci 0 should show 0x3f, but got {hex(segments)}"
 
     # 4. Trigger Manual Step (ui_in[0])
+    await ClockCycles(dut.clk, 20)
     dut._log.info("Pulsing ui_in[0] to request next Fibonacci number")
     dut.ui_in.value = 1      # Pulse high
     await ClockCycles(dut.clk, 2)
