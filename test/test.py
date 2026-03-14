@@ -85,7 +85,7 @@ async def test_fibonacci_sequence(dut):
 
     # Force internal registers to reach Fibonacci 24 on the next step
     fib_core.fib_number.value = 28657 # Fibonacci 23
-    fib_core.aux_reg.value    = 17711 # Fibonacci 22
+    fib_core.aux_reg.value    = 46368 # Fibonacci 24
     
     # Trigger pulse to reach 46368
     dut.ui_in.value = 1
