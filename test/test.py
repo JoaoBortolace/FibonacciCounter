@@ -39,7 +39,7 @@ async def test_fibonacci_sequence(dut):
         {"val": 2, "seg": 0x5b},
         {"val": 3, "seg": 0x4f},
         {"val": 5, "seg": 0x6d},
-        {"val": 8, "seg": 0x7d}
+        {"val": 8, "seg": 0x7f}
     ]
 
     for item in sequence:
