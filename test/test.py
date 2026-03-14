@@ -76,30 +76,32 @@ async def test_fibonacci_sequence(dut):
     dut._log.info(f"Ten Digit (1): {hex(seg_ten_13)}")
     assert seg_ten_13 == 0x06, f"Expected 0x06 for '1', got {hex(seg_ten_13)}"
 
-    # 5. Overflow Test: Fibonacci 24 (46368) -> Fibonacci 25 (Overflows to 0)
+    # 5. Overflow Test: Fibonacci 24 (46368)
     dut._log.info("Testing Max Fibonacci (46368) and Overflow behavior")
 
-    # We force the internal registers to a value near the limit to save time
-    # Note: 'dut.fib_inst' must match the instance name in your top-level
-    dut.fib_inst.fib_number.value = 28657 # Fibonacci 23
-    dut.fib_inst.aux_reg.value    = 17711 # Fibonacci 22
+    # Accessing the internal instance via the testbench hierarchy
+    # Path: tb (dut) -> user_project -> fib_inst
+    fib_core = dut.user_project.fib_inst
+
+    # Force internal registers to reach Fibonacci 24 on the next step
+    fib_core.fib_number.value = 28657 # Fibonacci 23
+    fib_core.aux_reg.value    = 17711 # Fibonacci 22
     
-    # Pulse 'advance' to reach Fibonacci 24 (46368)
+    # Trigger pulse to reach 46368
     dut.ui_in.value = 1
     await ClockCycles(dut.clk, 2)
     dut.ui_in.value = 0
     
-    # Wait for conversion
+    # Wait for BCD conversion of 46368
     while (int(dut.uo_out.value) & 0x80) == 0:
         await RisingEdge(dut.clk)
         
-    # Check if units of 46368 (which is '8') shows correctly
+    # Check unit digit of 46368 (digit 8)
     seg_unit_max = await get_segments_for_digit(dut, 0x01)
-    assert seg_unit_max == 0x7d, f"Expected 0x7d for digit '8', got {hex(seg_unit_max)}"
-    dut._log.info("Successfully reached Fibonacci 46368")
+    dut._log.info(f"Max Fibonacci Unit (8): {hex(seg_unit_max)}")
+    assert seg_unit_max == 0x7f, f"Expected 0x7f for '8', got {hex(seg_unit_max)}"
 
-    # Trigger OVERFLOW: 46368 + 28657 = 75025 (> 65535)
-    dut._log.info("Triggering overflow (75025 > 16-bit)...")
+    # Trigger Overflow (46368 + 28657 = 75025 > 65535)
     dut.ui_in.value = 1
     await ClockCycles(dut.clk, 2)
     dut.ui_in.value = 0
@@ -107,9 +109,9 @@ async def test_fibonacci_sequence(dut):
     while (int(dut.uo_out.value) & 0x80) == 0:
         await RisingEdge(dut.clk)
 
-    # After overflow, the core should reset to 0
+    # After overflow, it should reset to 0
     seg_overflow = await get_segments_for_digit(dut, 0x01)
+    dut._log.info(f"Overflow result (0): {hex(seg_overflow)}")
     assert seg_overflow == 0x3f, f"Expected 0x3f (0) after overflow, got {hex(seg_overflow)}"
-    dut._log.info("Overflow handled correctly: Counter reset to 0")
 
     dut._log.info("Full sequence and multi-digit BCD tests passed!")
