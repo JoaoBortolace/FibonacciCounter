@@ -35,7 +35,14 @@ async def test_full_fibonacci_all_digits(dut):
     fib_curr, fib_prev = 0, 1
     
     # We will test until it overflows (16-bit limit)
-    while fib_curr <= 65535:
+
+     # Get number of bits
+    num_bits = int(dut.user_project.fib_inst.NUM_BITS.value)
+    max_value = (1 << num_bits) - 1
+    
+    dut._log.info(f"Test dynamic setup: NUM_BITS={num_bits}, MAX_VAL={max_value}")
+    
+    while fib_curr <= max_value:
         dut._log.info(f"--- Testing Fibonacci: {fib_curr} ---")
 
         # 1. Wait for BCD Ready (Bit 7 of uo_out)
