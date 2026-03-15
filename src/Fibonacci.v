@@ -1,6 +1,9 @@
 `default_nettype none
 
-module tt_um_fibonacci_JoaoBortolace (
+module tt_um_fibonacci_JoaoBortolace #(
+    parameter NUM_BITS = 19,
+    parameter NUM_DIG = 6
+)(
     input  wire [7:0] ui_in,    // Inputs: [0]=step_pulse_button
     output wire [7:0] uo_out,   // Outputs: [6:0]=7seg_segments (abcdefg), [7]=bcd_ready_flag
     input  wire [7:0] uio_in,   // IOs: Input mode (not used)
@@ -11,14 +14,14 @@ module tt_um_fibonacci_JoaoBortolace (
     input  wire rst_n           // Active low reset
 );
 
-    // PIN CONFIGURATION
-    // Set uio[4:0] as outputs for 5 displays, others as inputs
-    assign uio_oe  = 8'b00011111; 
-    assign uio_out[7:5] = 3'b000;
+    // --- IO CONFIGURATION ---
+    // Enable only the necessary bits for the number of digits
+    assign uio_oe  = (1 << NUM_DIG) - 1; 
+    assign uio_out[7:NUM_DIG] = 0; 
 
     // INTERNAL SIGNALS
-    wire [15:0] fib_number;
-    wire [19:0] bcd_val;
+    wire [NUM_BITS-1:0] fib_number;
+    wire [(4*NUM_DIG)-1:0] bcd_val;
     wire bcd_ready;
     wire start_bcd;
 
@@ -32,18 +35,21 @@ module tt_um_fibonacci_JoaoBortolace (
 
     // FIBONACCI COUNTER INSTANCE
     FibonacciCounter #(
-        .NUM_BITS(16)
+        .NUM_BITS(NUM_BITS)
     ) fib_inst (
         .clk(clk),
         .rst_n(rst_n),
         .advance(step_pulse),
         .disp_ready(bcd_ready),
         .newNumber(start_bcd),
-        .fib_number(fib_number)
+        .fib_number(fib_number) 
     );
 
     // BINARY TO BCD CONVERTER (DOUBLE DABBLE)
-    BinToBCD bcd_inst (
+    BinToBCD #(
+        .NUM_BITS(NUM_BITS),
+        .NUM_DIG(NUM_DIG)
+    ) bcd_inst (
         .clk(clk),
         .rst_n(rst_n),
         .start(start_bcd),
@@ -53,30 +59,28 @@ module tt_um_fibonacci_JoaoBortolace (
     );
 
     // 7-SEGMENT DISPLAY MULTIPLEXING (RING COUNTER)
-    reg [4:0] ring_cnt;    
+    reg [NUM_DIG-1:0] ring_cnt;    
     always @(posedge clk or negedge rst_n) begin
         if (!rst_n)
-            ring_cnt <= 5'b00001;
+            ring_cnt <= {{(NUM_DIG-1){1'b0}}, 1'b1};
         else
             // Rotate bit (Ring Counter)
-            ring_cnt <= {ring_cnt[3:0], ring_cnt[4]};
+            ring_cnt <= {ring_cnt[NUM_DIG-2:0], ring_cnt[NUM_DIG-1]};
     end
 
     // DIGIT SELECTION (One-hot output)
-    assign uio_out[4:0] = ring_cnt;
+    assign uio_out[NUM_DIG-1:0] = ring_cnt;
     assign uo_out[7] = bcd_ready; // Visual status flag
 
     // MUX TO SELECT BCD DIGIT FOR DECODER
     reg [3:0] dispData;
+    integer idx;
     always @(*) begin
-        case (ring_cnt)
-            5'b00001: dispData = bcd_val[3:0];   // Unit
-            5'b00010: dispData = bcd_val[7:4];   // Ten
-            5'b00100: dispData = bcd_val[11:8];  // Hundred
-            5'b01000: dispData = bcd_val[15:12]; // Thousand
-            5'b10000: dispData = bcd_val[19:16]; // Ten Thousand
-            default:  dispData = 4'h0;
-        endcase
+        dispData = 4'h0;
+        for (idx = 0; idx < NUM_DIG; idx = idx + 1) begin
+            if (ring_cnt[idx]) 
+                dispData = bcd_val[idx*4 +: 4];
+        end
     end
     
     // COMBINATIONAL 7-SEGMENT DECODER (Active High)
@@ -133,27 +137,31 @@ module FibonacciCounter #(
     end
 endmodule
 
-module BinToBCD (
+module BinToBCD #(
+    parameter NUM_BITS = 16,
+    parameter NUM_DIG = 5
+)(
     input wire clk, rst_n,
     input wire start,
-    input wire [15:0] bin_in,
-    output reg [19:0] bcd_out,
+    input wire [NUM_BITS-1:0] bin_in,
+    output reg [(4*NUM_DIG)-1:0] bcd_out,
     output reg ready
 );
-    reg [4:0] count;
-    reg [35:0] shift_reg; // [20-bit BCD | 16-bit Binary]
+    reg [$clog2(NUM_BITS+1)-1:0] count;
+    reg [(4*NUM_DIG)+NUM_BITS-1:0] shift_reg; // [20-bit BCD | 16-bit Binary]
 
     // Combinational logic for BCD adjustments (Double Dabble)
-    reg [35:0] bcd_temp;
+    reg [(4*NUM_DIG)+NUM_BITS-1:0] bcd_temp;
     
+    integer i;
     always @(*) begin
         bcd_temp = shift_reg;
         // If BCD digit >= 5, add 3 BEFORE shifting
-        if (bcd_temp[19:16] >= 5) bcd_temp[19:16] = bcd_temp[19:16] + 3;
-        if (bcd_temp[23:20] >= 5) bcd_temp[23:20] = bcd_temp[23:20] + 3;
-        if (bcd_temp[27:24] >= 5) bcd_temp[27:24] = bcd_temp[27:24] + 3;
-        if (bcd_temp[31:28] >= 5) bcd_temp[31:28] = bcd_temp[31:28] + 3;
-        if (bcd_temp[35:32] >= 5) bcd_temp[35:32] = bcd_temp[35:32] + 3;
+        for (i = 0; i < NUM_DIG; i = i + 1) begin
+            if (bcd_temp[(i*4) + NUM_BITS +: 4] >= 5) begin
+                bcd_temp[(i*4) + NUM_BITS +: 4] = bcd_temp[(i*4) + NUM_BITS +: 4] + 3;
+            end
+        end
     end
 
     always @(posedge clk or negedge rst_n) begin
@@ -165,17 +173,17 @@ module BinToBCD (
         end else begin
             if (ready) begin
                 if (start) begin
-                    shift_reg <= {20'b0, bin_in};
-                    count <= 16;
+                    shift_reg <=  {{(4*NUM_DIG){1'b0}}, bin_in};
+                    count <= NUM_BITS;
                     ready <= 0;
                 end
             end else begin
                 if (count == 0) begin
                     ready <= 1;
-                    bcd_out <= shift_reg[35:16];
+                    bcd_out <= shift_reg[(4*NUM_DIG)+NUM_BITS-1:NUM_BITS];
                 end else begin
                     // Apply BCD adjustment and shift left
-                    shift_reg <= {bcd_temp[34:0], 1'b0};
+                    shift_reg <= bcd_temp << 1;
                     count <= count - 1;
                 end
             end
