@@ -5,14 +5,14 @@ from cocotb.triggers import RisingEdge, ClockCycles
 # Segment map (gfedcba) from your Verilog code
 SEG_MAP = [0x3f, 0x06, 0x5b, 0x4f, 0x66, 0x6d, 0x7d, 0x07, 0x7f, 0x6f]
 
-async def get_segments_for_digit(dut, digit_index):
+async def get_segments_for_digit(dut, digit_index, num_dig):
     """
     Waits for the multiplexer to select a specific digit and returns its segments.
     digit_index: 0 (units) to 4 (ten thousands)
     """
     mask = 1 << digit_index
     for _ in range(20):
-        if (int(dut.uio_out.value) & 0x1F) == mask:
+        if (int(dut.uio_out.value) & ((1 << num_dig) - 1)) == mask:
             return int(dut.uo_out.value) & 0x7F
         await RisingEdge(dut.clk)
     return None
@@ -65,7 +65,7 @@ async def test_full_fibonacci_all_digits(dut):
             digit_val = temp_val % 10
             expected_seg = SEG_MAP[digit_val]
             
-            actual_seg = await get_segments_for_digit(dut, i)
+            actual_seg = await get_segments_for_digit(dut, i, num_dig)
             
             # Log only units or if digit is non-zero to keep log clean
             if i == 0 or temp_val > 0:
