@@ -37,7 +37,12 @@ async def test_full_fibonacci_all_digits(dut):
     # We will test until it overflows (16-bit limit)
 
      # Get number of bits
-    num_bits = int(dut.user_project.fib_inst.NUM_BITS.value)
+    try:
+        num_bits = int(dut.user_project.fib_inst.NUM_BITS.value)
+    except AttributeError:
+        # No GL Test, a hierarquia some. Defina manualmente o valor aqui:
+        num_bits = 23 # Max in 7 displays
+    
     max_value = (1 << num_bits) - 1
     
     dut._log.info(f"Test dynamic setup: NUM_BITS={num_bits}, MAX_VAL={max_value}")
@@ -104,4 +109,4 @@ async def test_full_fibonacci_all_digits(dut):
         
         temp_val //= 10
 
-    dut._log.info("Full sequence (0 to 46368) verified for ALL digits!")
+    dut._log.info("Full sequence verified for ALL digits!")
