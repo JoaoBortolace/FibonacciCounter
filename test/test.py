@@ -66,7 +66,7 @@ async def test_full_fibonacci_all_digits(dut):
 
         # 3. Advance Fibonacci
         next_val = fib_curr + fib_prev
-        if next_val > 65535: break # End of 16-bit sequence
+        if next_val > max_value: break # End of N-bit sequence
         
         fib_prev = fib_curr
         fib_curr = next_val
