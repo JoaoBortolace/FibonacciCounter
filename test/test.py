@@ -105,7 +105,7 @@ async def test_full_fibonacci_all_digits(dut):
         digit_val = temp_val % 10
         expected_seg = SEG_MAP[digit_val]
         
-        actual_seg = await get_segments_for_digit(dut, i)
+        actual_seg = await get_segments_for_digit(dut, i, num_dig)
         
         # Log only units or if digit is non-zero to keep log clean
         if i == 0 or temp_val > 0:
