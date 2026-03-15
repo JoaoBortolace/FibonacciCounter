@@ -1,8 +1,8 @@
 `default_nettype none
 
 module tt_um_fibonacci_JoaoBortolace #(
-    parameter NUM_BITS = 19,
-    parameter NUM_DIG = 6
+    parameter NUM_BITS = 23,
+    parameter NUM_DIG = 7
 )(
     input  wire [7:0] ui_in,    // Inputs: [0]=step_pulse_button
     output wire [7:0] uo_out,   // Outputs: [6:0]=7seg_segments (abcdefg), [7]=bcd_ready_flag
