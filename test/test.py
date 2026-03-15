@@ -44,8 +44,13 @@ async def test_full_fibonacci_all_digits(dut):
         num_bits = 23 # Max in 7 displays
     
     max_value = (1 << num_bits) - 1
+
+    try:
+        num_dig = int(dut.user_project.fib_inst.NUM_DIG.value)
+    except AttributeError:
+        num_dig = 7 # Valor fixo para o pós-síntese
     
-    dut._log.info(f"Test dynamic setup: NUM_BITS={num_bits}, MAX_VAL={max_value}")
+    dut._log.info(f"Test dynamic setup: NUM_BITS={num_bits}, NUM_DIG={num_dig}, MAX_VAL={max_value}")
     
     while fib_curr <= max_value:
         dut._log.info(f"--- Testing Fibonacci: {fib_curr} ---")
@@ -56,7 +61,7 @@ async def test_full_fibonacci_all_digits(dut):
 
         # 2. Check all 5 digits for the current number
         temp_val = fib_curr
-        for i in range(5):
+        for i in range(num_dig):
             digit_val = temp_val % 10
             expected_seg = SEG_MAP[digit_val]
             
